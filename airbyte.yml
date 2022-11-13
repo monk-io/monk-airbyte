@@ -1,0 +1,276 @@
+namespace: monk-airbyte
+
+airbyte-common:
+  metadata:
+    defines: metadata
+    name: Airbyte
+    description: Airbyte is an open-source data integration platform to build ELT pipelines. Consolidate your data in your data warehouses, lakes and databases.
+    website: https://airbyte.com/
+    publisher: monk.io
+    icon: https://assets-global.website-files.com/6064b31ff49a2d31e0493af1/62fe7dbb7344b272e290f1c7_airbytelogo.png
+  
+  variables:
+    volume_local:
+      type: string
+      value: <- `${monk-volume-path}/airbyte`
+    airbyte-version:
+      env: AIRBYTE_VERSION
+      type: string
+      value: <- `${airbyte_version}`
+    airbyte-config-database-password:
+      env: CONFIG_DATABASE_PASSWORD
+      type: string
+      value: <- `${airbyte_config_database_password}`
+    airbyte-config-database-url:
+      env: CONFIG_DATABASE_URL
+      type: string
+      value: <- `${airbyte_config_database_url}`
+    airbyte-config-database-user:
+      env: CONFIG_DATABASE_USER
+      type: string
+      value: <- `${airbyte_config_database_user}`
+    airbyte-database-password:
+      env: DATABASE_PASSWORD
+      type: string
+      value: <- `${airbyte_database_password}`
+    airbyte-database-host:
+      type: string
+      value: <- get-hostname("monk-airbyte/airbyte-db", "db") split(".dns.podman") join("")
+    airbyte-database-url:
+      env: DATABASE_URL
+      type: string
+      value: <- `jdbc:postgresql://${airbyte-database-host}:5432/airbyte`
+    airbyte-database-user:
+      env: DATABASE_USER
+      type: string
+      value: docker
+    airbyte-log-level:
+      env: LOG_LEVEL
+      type: string
+      value: <- `${airbyte_log_level}`
+    airbyte-database-migration:
+      env: RUN_DATABASE_MIGRATION_ON_STARTUP
+      type: string
+      value: <- `${airbyte_database_migration}`
+    airbyte-config-root:
+      env: CONFIG_ROOT
+      type: string
+      value: /data
+    airbyte-config-database-minimum-flyway-mig-version:
+      env: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+      type: string
+      value: 0.35.15.001
+    airbyte-deployment-mode:
+      env: DEPLOYMENT_MODE
+      type: string
+      value: production
+    airbyte-server-host:
+      type: string
+      value: <- get-hostname("monk-airbyte/airbyte-server", "server") split(".dns.podman") join("")
+    airbyte-internal-api-host:
+      env: INTERNAL_API_HOST
+      type: string
+      value: <- `${airbyte-server-host}:8001`
+    airbyte-jobs-dabatase-minimum-flyway-migration:
+      env: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+      type: string
+      value: 0.29.15.001
+    airbyte-temporal-host-address:
+      type: string
+      value: <- get-hostname("monk-airbyte/airbyte-temporal", "temporal") split(".dns.podman") join("")
+    airbyte-temporal-host:
+      env: TEMPORAL_HOST
+      type: string
+      value: <- `${airbyte-temporal-host-address}:7233`
+    airbyte-tracking-strategy:
+      env: TRACKING_STRATEGY
+      type: string
+      value: <- `${airbyte_trackings_strategy}`
+    airbyte-webapp-url:
+      env: WEBAPP_URL
+      type: string
+      value: <- `http://${airbyte_domain}:${airbyte_web_port}/`
+    airflow-workspace-root:
+      env: WORKSPACE_ROOT
+      type: string
+      value: /tmp/workspace
+    airflow-job-error-reporting:
+      env: JOB_ERROR_REPORTING_STRATEGY
+      type: string
+      value: logging
+    airflow-job-error-reporting-sentry-dsn:
+      env: JOB_ERROR_REPORTING_SENTRY_DSN
+      type: string
+      value: ''
+    airflow-micronaut:
+      env: MICRONAUT_ENVIRONMENTS
+      type: string
+      value: control-plane
+
+airbyte-init:
+  inherits: ./airbyte-common
+  defines: runnable
+  variables:
+    airbyte_local_root:
+      env: LOCAL_ROOT
+      type: string
+      value: /tmp/airbyte_local
+    airbyte_local_root_parent:
+      env: HACK_LOCAL_ROOT_PARENT
+      type: string
+      value: /tmp
+  containers:
+    init:
+      image: airbyte/init:0.40.18
+      ports:
+        - <- `0.0.0.0:8001:7000`
+      paths:
+        - <- `${volume_local}/tmp:/local_parent`
+      bash: /bin/sh -c "./scripts/create_mount_directories.sh /local_parent ${HACK_LOCAL_ROOT_PARENT} ${LOCAL_ROOT}"
+
+airbyte-bootloader:
+  inherits: ./airbyte-common
+  defines: runnable
+  containers:
+    bootloader:
+      image: airbyte/bootloader:0.40.18
+
+airbyte-db:
+  inherits: ./airbyte-common
+  defines: runnable
+  containers:
+    db:
+      image: airbyte/db:0.40.18
+      environment:
+        - <- `POSTGRES_PASSWORD=${airbyte-database-password}`
+        - <- `POSTGRES_USER=${airbyte-database-user}`
+
+airbyte-worker:
+  inherits: ./airbyte-common
+  defines: runnable
+  variables:
+    airbyte_local_root:
+      env: LOCAL_ROOT
+      type: string
+      value: /tmp/airbyte_local
+    airbyte-auto-disable-failing:
+      env: AUTO_DISABLE_FAILING_CONNECTIONS
+      type: string
+      value: false
+    airbyte-workspace-mount:
+      env: WORKSPACE_DOCKER_MOUNT
+      type: string
+      value: /tmp/workspace
+    
+  containers:
+    worker:
+      image: airbyte/worker:0.40.18
+      ports: 
+        - 0.0.0.0:9000:9000
+      paths:
+        - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
+        - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
+      environment:
+        - SYNC_JOB_MAX_ATTEMPTS=3
+        - SYNC_JOB_MAX_TIMEOUT_DAYS=3
+        - JOB_MAIN_CONTAINER_CPU_REQUEST=
+        - JOB_MAIN_CONTAINER_CPU_LIMIT=
+        - JOB_MAIN_CONTAINER_MEMORY_REQUEST=
+        - JOB_MAIN_CONTAINER_MEMORY_LIMIT=
+        - ACTIVITY_MAX_ATTEMPT=
+        - ACTIVITY_INITIAL_DELAY_BETWEEN_ATTEMPTS_SECONDS=
+        - ACTIVITY_MAX_DELAY_BETWEEN_ATTEMPTS_SECONDS=
+        - WORKFLOW_FAILURE_RESTART_DELAY_SECONDS=
+        - USE_STREAM_CAPABLE_STATE=true
+        - OTEL_COLLECTOR_ENDPOINT=http://host.docker.internal:4317
+      
+airbyte-server:
+  inherits: ./airbyte-common
+  defines: runnable
+  variables:
+    airbyte_local_root:
+      env: LOCAL_ROOT
+      type: string
+      value: /tmp/airbyte_local
+    airbyte-auto-disable-failing:
+      env: AUTO_DISABLE_FAILING_CONNECTIONS
+      type: string
+      value: false
+    airbyte-workspace-mount:
+      env: WORKSPACE_DOCKER_MOUNT
+      type: string
+      value: /tmp/workspace
+    
+  containers:
+    server:
+      image: airbyte/server:0.40.18
+      ports: 
+        - 0.0.0.0:9001:9000
+      paths:
+        - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
+        - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
+  depends:
+    wait-for:
+      runnables:
+        - monk-airbyte/airbyte-temporal
+        - monk-airbyte/airbyte-worker
+      timeout: 60
+
+
+airbyte-webapp:
+  inherits: ./airbyte-common
+  defines: runnable
+  containers:
+    webapp:
+      image: airbyte/webapp:0.40.18
+      ports: 
+        - 0.0.0.0:80:80
+      environment:
+        - API_URL=/api/v1/
+        - SYNC_JOB_MAX_TIMEOUT_DAYS=3
+
+airbyte-temporal:
+  inherits: ./airbyte-common
+  defines: runnable
+  containers:
+    temporal:
+      image: airbyte/temporal:0.40.18
+      bash: /etc/temporal/start_temporal.sh
+      ports: 
+        - 0.0.0.0:7233:7233
+      environment:
+        - DB=postgresql
+        - DB_PORT=5432
+        - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
+        - <- `POSTGRES_PWD=${airbyte-database-password}`
+        - <- `POSTGRES_SEEDS=${airbyte-database-host}`
+        - <- `POSTGRES_USER=${airbyte-database-user}`
+  files:
+    temporal-config:
+      container: temporal
+      mode: 0755
+      path: config/dynamicconfig/development.yaml
+      contents: <<< files/temporal.yml
+    temporal-start:
+      container: temporal
+      mode: 0755
+      path: /etc/temporal/start_temporal.sh
+      contents: |
+        #!/usr/bin/env bash
+        export BIND_ON_IP=$(nslookup {{ v "airbyte-temporal-host-address" }} | grep "Address" | awk '{print $2}' | sed -n 2p)
+        echo $BIND_ON_IP
+        ./update-and-start-temporal.sh
+
+airbyte-cron:
+  inherits: ./airbyte-common
+  defines: runnable
+  variables:
+    airbyte-workspace-mount:
+      env: WORKSPACE_DOCKER_MOUNT
+      type: string
+      value: /tmp/workspace
+  containers:
+    cron:
+      image: airbyte/cron:0.40.18
+      paths:
+        - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`

@@ -1,0 +1,3 @@
+REPO airbyte
+LOAD airbyte.yml stack.yml
+RESOURCES files/temporal.yml

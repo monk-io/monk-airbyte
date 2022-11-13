@@ -1,0 +1,45 @@
+namespace: monk-airbyte
+
+stack:
+  defines: process-group
+  runnable-list:
+    - monk-airbyte/airbyte-db
+    - monk-airbyte/airbyte-init
+    - monk-airbyte/airbyte-bootloader
+    - monk-airbyte/airbyte-worker
+    - monk-airbyte/airbyte-temporal
+    - monk-airbyte/airbyte-cron
+    - monk-airbyte/airbyte-server
+    - monk-airbyte/airbyte-webapp
+
+  variables:
+    airbyte_version:
+      type: string
+      value: 0.40.18
+    airbyte_config_database_password:
+      type: string
+      value: ''
+    airbyte_config_database_user:
+      type: string
+      value: ''
+    airbyte_config_database_url:
+      type: string
+      value: ''
+    airbyte_database_password:
+      type: string
+      value: monk
+    airbyte_log_level:
+      type: string
+      value: INFO
+    airbyte_database_migration:
+      type: string
+      value: true
+    airbyte_trackings_strategy:
+      type: string
+      value: segment
+    airbyte_domain:
+      type: string
+      value: localhost
+    airbyte_web_port:
+      type: string
+      value: 8000
