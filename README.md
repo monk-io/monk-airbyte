@@ -1,13 +1,16 @@
 # Airbyte & Monk
+
 This repository contains Monk.io template to deploy Airbyte & Monk either locally or on cloud of your choice (AWS, GCP, Azure, Digital Ocean).
 
-# Prerequisites
+## Prerequisites
+
 - [Install Monk](https://docs.monk.io/docs/get-monk)
 - [Register and Login Monk](https://docs.monk.io/docs/acc-and-auth)
 - [Add Cloud Provider](https://docs.monk.io/docs/cloud-provider)
 - [Add Instance](https://docs.monk.io/docs/multi-cloud)
 
-#### Make sure monkd is running.
+## Make sure monkd is running
+
 ```bash
 foo@bar:~$ monk status
 daemon: ready
@@ -16,18 +19,18 @@ not connected to cluster
 ```
 
 ## Clone Repository
+
 ```bash
 git clone https://github.com/monk-io/monk-airbyte
 ```
 
 ## Load Template
+
 ```bash
 cd monk-airbyte
 monk load MANIFEST
 ```
 
-
-#### Let's take a look at the themes I have installed.
 ```bash
 foo@bar:~$ monk list monk-airbyte
 ✔ Got the list
@@ -44,6 +47,7 @@ group     monk-airbyte/stack               local       -        -
 ```
 
 ## Deploy Stack
+
 ```bash
 foo@bar:~$ monk run monk-airbyte/stack
 ✔ Starting the job: templates/local/monk-airbyte/stack... DONE
@@ -106,34 +110,32 @@ foo@bar:~$ monk run monk-airbyte/stack
           └─🧩 airbyte/db:0.40.18
 
 💡 You can inspect and manage your above stack with these commands:
-	monk logs (-f) monk-airbyte/stack - Inspect logs
-	monk shell     monk-airbyte/stack - Connect to the container's shell
-	monk do        monk-airbyte/stack/action_name - Run defined action (if exists)
+ monk logs (-f) monk-airbyte/stack - Inspect logs
+ monk shell     monk-airbyte/stack - Connect to the container's shell
+ monk do        monk-airbyte/stack/action_name - Run defined action (if exists)
 💡 Check monk help for more!
 ```
+
 ## Check web gui
 
 `http://16.16.26.126/`
 
-
-
 ## Variables
+
 The variables are in `stack.yml` file. You can quickly setup by editing the values here.
 
-| Variable                     	| Description                               	|
-|------------------------------	|-------------------------------------------	|
-| airbyte_version                |Airbyte version, Default: 0.40.18 	               |
-| airbyte_config_database_password                    | Airbyte config database password, Default: '' 	               |
-| airbyte_config_database_user                    | Airbyte config database user, Default: '' 	               |
-| airbyte_config_database_url                    | Airbyte config database url, Default: '' 	               |
-| airbyte_database_password                    | Airbyte database password, Default: monk 	               |
-| airbyte_database_migration                    | Airbyte database migration, Default: true 	               |
-| airbyte_trackings_strategy                    | Airbyte tracking strategy, Default: segment 	               |
-
+| Variable                         | Description                                   |
+| -------------------------------- | --------------------------------------------- |
+| airbyte_version                  | Airbyte version, Default: 0.40.18             |
+| airbyte_config_database_password | Airbyte config database password, Default: '' |
+| airbyte_config_database_user     | Airbyte config database user, Default: ''     |
+| airbyte_config_database_url      | Airbyte config database url, Default: ''      |
+| airbyte_database_password        | Airbyte database password, Default: monk      |
+| airbyte_database_migration       | Airbyte database migration, Default: true     |
+| airbyte_trackings_strategy       | Airbyte tracking strategy, Default: segment   |
 
 ## Stop, remove and clean up workloads and templates
 
 ```bash
 monk purge -x -a
 ```
-

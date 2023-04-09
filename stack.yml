@@ -1,17 +1,30 @@
-namespace: monk-airbyte
+---
+namespace: airbyte
 
 stack:
   defines: process-group
-  runnable-list:
-    - monk-airbyte/airbyte-db
-    - monk-airbyte/airbyte-init
-    - monk-airbyte/airbyte-bootloader
-    - monk-airbyte/airbyte-worker
-    - monk-airbyte/airbyte-temporal
-    - monk-airbyte/airbyte-cron
-    - monk-airbyte/airbyte-server
-    - monk-airbyte/airbyte-webapp
+  metadata:
+    name: Airbyte
+    website: https://airbyte.com/
+    publisher: monk.io
+    icon: https://assets-global.website-files.com/6064b31ff49a2d31e0493af1/62fe7dbb7344b272e290f1c7_airbytelogo.png
+    description: |
+      Airbyte is an open-source data integration platform that enables businesses to easily and efficiently move data from various sources to their desired destinations.
 
+      With its user-friendly interface and powerful features, Airbyte simplifies the process of data integration, allowing businesses to focus on analyzing and utilizing their data to make informed decisions.
+
+      Its flexible architecture supports a wide range of data sources and destinations, making it a versatile solution for businesses of all sizes and industries. Airbyte also offers robust data transformation capabilities, allowing users to clean, enrich, and transform their data before sending it to its destination.
+
+      With its reliability, scalability, and ease of use, Airbyte is a must-have tool for any business looking to streamline their data integration process.
+  runnable-list:
+    - airbyte/airbyte-db
+    - airbyte/airbyte-init
+    - airbyte/airbyte-bootloader
+    - airbyte/airbyte-worker
+    - airbyte/airbyte-temporal
+    - airbyte/airbyte-cron
+    - airbyte/airbyte-server
+    - airbyte/airbyte-webapp
   variables:
     airbyte_version:
       type: string
@@ -22,9 +35,9 @@ stack:
     airbyte_config_database_user:
       type: string
       value: ''
-    airbyte_config_database_url:
-      type: string
-      value: ''
+    # airbyte_config_database_url:
+    #   type: string
+    #   value: ''
     airbyte_database_password:
       type: string
       value: monk

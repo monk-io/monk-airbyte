@@ -1,14 +1,21 @@
-namespace: monk-airbyte
+---
+namespace: airbyte
 
 airbyte-common:
   metadata:
-    defines: metadata
     name: Airbyte
-    description: Airbyte is an open-source data integration platform to build ELT pipelines. Consolidate your data in your data warehouses, lakes and databases.
     website: https://airbyte.com/
     publisher: monk.io
     icon: https://assets-global.website-files.com/6064b31ff49a2d31e0493af1/62fe7dbb7344b272e290f1c7_airbytelogo.png
-  
+    description: |
+      Airbyte is an open-source data integration platform that enables businesses to easily and efficiently move data from various sources to their desired destinations.
+
+      With its user-friendly interface and powerful features, Airbyte simplifies the process of data integration, allowing businesses to focus on analyzing and utilizing their data to make informed decisions.
+
+      Its flexible architecture supports a wide range of data sources and destinations, making it a versatile solution for businesses of all sizes and industries. Airbyte also offers robust data transformation capabilities, allowing users to clean, enrich, and transform their data before sending it to its destination.
+
+      With its reliability, scalability, and ease of use, Airbyte is a must-have tool for any business looking to streamline their data integration process.
+    private: true
   variables:
     volume_local:
       type: string
@@ -34,8 +41,13 @@ airbyte-common:
       type: string
       value: <- `${airbyte_database_password}`
     airbyte-database-host:
+      env: DATABASE_HOST
       type: string
-      value: <- get-hostname("monk-airbyte/airbyte-db", "db") split(".dns.podman") join("")
+      value: <- connection-hostname("db")
+    airbyte-database-port:
+      env: DATABASE_PORT
+      value: 5432
+      type: string
     airbyte-database-url:
       env: DATABASE_URL
       type: string
@@ -66,7 +78,7 @@ airbyte-common:
       value: production
     airbyte-server-host:
       type: string
-      value: <- get-hostname("monk-airbyte/airbyte-server", "server") split(".dns.podman") join("")
+      value: <- connection-hostname("server")
     airbyte-internal-api-host:
       env: INTERNAL_API_HOST
       type: string
@@ -77,7 +89,7 @@ airbyte-common:
       value: 0.29.15.001
     airbyte-temporal-host-address:
       type: string
-      value: <- get-hostname("monk-airbyte/airbyte-temporal", "temporal") split(".dns.podman") join("")
+      value: <- connection-hostname("temporal")
     airbyte-temporal-host:
       env: TEMPORAL_HOST
       type: string
@@ -106,9 +118,19 @@ airbyte-common:
       env: MICRONAUT_ENVIRONMENTS
       type: string
       value: control-plane
+  connections:
+    db:
+      runnable: airbyte/airbyte-db
+      service: db
+    server:
+      runnable: airbyte/airbyte-server
+      service: server
+    temporal:
+      runnable: airbyte/airbyte-temporal
+      service: temporal
 
 airbyte-init:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   variables:
     airbyte_local_root:
@@ -121,32 +143,45 @@ airbyte-init:
       value: /tmp
   containers:
     init:
-      image: airbyte/init:0.40.18
+      image: airbyte/init
+      image-tag: <- `${airbyte_version}`
       ports:
-        - <- `0.0.0.0:8001:7000`
+        - 8001:7000
       paths:
         - <- `${volume_local}/tmp:/local_parent`
       bash: /bin/sh -c "./scripts/create_mount_directories.sh /local_parent ${HACK_LOCAL_ROOT_PARENT} ${LOCAL_ROOT}"
 
 airbyte-bootloader:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   containers:
     bootloader:
-      image: airbyte/bootloader:0.40.18
+      image: airbyte/bootloader
+      image-tag: <- `${airbyte_version}`
 
 airbyte-db:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   containers:
     db:
-      image: airbyte/db:0.40.18
+      image: airbyte/db
+      image-tag: <- `${airbyte_version}`
       environment:
         - <- `POSTGRES_PASSWORD=${airbyte-database-password}`
         - <- `POSTGRES_USER=${airbyte-database-user}`
+  checks:
+    readiness:
+      code: exec("db", "pg_isready") "accepting connections" contains?
+      period: 15
+      initialDelay: 10
+  services:
+    db:
+      container: db
+      port: 5432
+      protocol: tcp
 
 airbyte-worker:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   variables:
     airbyte_local_root:
@@ -161,12 +196,12 @@ airbyte-worker:
       env: WORKSPACE_DOCKER_MOUNT
       type: string
       value: /tmp/workspace
-    
   containers:
     worker:
-      image: airbyte/worker:0.40.18
-      ports: 
-        - 0.0.0.0:9000:9000
+      image: airbyte/worker
+      image-tag: <- `${airbyte_version}`
+      ports:
+        - 9000:9000
       paths:
         - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
         - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
@@ -183,9 +218,14 @@ airbyte-worker:
         - WORKFLOW_FAILURE_RESTART_DELAY_SECONDS=
         - USE_STREAM_CAPABLE_STATE=true
         - OTEL_COLLECTOR_ENDPOINT=http://host.docker.internal:4317
-      
+  depends:
+    wait-for:
+      runnables:
+        - airbyte/airbyte-db
+      timeout: 60
+
 airbyte-server:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   variables:
     airbyte_local_root:
@@ -200,44 +240,56 @@ airbyte-server:
       env: WORKSPACE_DOCKER_MOUNT
       type: string
       value: /tmp/workspace
-    
   containers:
     server:
-      image: airbyte/server:0.40.18
-      ports: 
-        - 0.0.0.0:9001:9000
+      image: airbyte/server
+      image-tag: <- `${airbyte_version}`
+      ports:
+        - 9001:9000
       paths:
         - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
         - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
   depends:
     wait-for:
       runnables:
-        - monk-airbyte/airbyte-temporal
-        - monk-airbyte/airbyte-worker
+        - airbyte/airbyte-temporal
+        - airbyte/airbyte-worker
+        - airbyte/airbyte-db
       timeout: 60
-
+  services:
+    server:
+      container: server
+      port: 9000
+      protocol: tcp
 
 airbyte-webapp:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   containers:
     webapp:
-      image: airbyte/webapp:0.40.18
-      ports: 
-        - 0.0.0.0:80:80
+      image: airbyte/webapp
+      image-tag: <- `${airbyte_version}`
+      ports:
+        - 80:80
       environment:
         - API_URL=/api/v1/
         - SYNC_JOB_MAX_TIMEOUT_DAYS=3
+  depends:
+    wait-for:
+      runnables:
+        - airbyte/airbyte-db
+      timeout: 60
 
 airbyte-temporal:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   containers:
     temporal:
-      image: airbyte/temporal:0.40.18
+      image: airbyte/temporal
+      image-tag: <- `${airbyte_version}`
       bash: /etc/temporal/start_temporal.sh
-      ports: 
-        - 0.0.0.0:7233:7233
+      ports:
+        - 7233:7233
       environment:
         - DB=postgresql
         - DB_PORT=5432
@@ -260,9 +312,19 @@ airbyte-temporal:
         export BIND_ON_IP=$(nslookup {{ v "airbyte-temporal-host-address" }} | grep "Address" | awk '{print $2}' | sed -n 2p)
         echo $BIND_ON_IP
         ./update-and-start-temporal.sh
+  depends:
+    wait-for:
+      runnables:
+        - airbyte/airbyte-db
+      timeout: 60
+  services:
+    temporal:
+      container: temporal
+      port: 7233
+      protocol: tcp
 
 airbyte-cron:
-  inherits: ./airbyte-common
+  inherits: airbyte/airbyte-common
   defines: runnable
   variables:
     airbyte-workspace-mount:
@@ -271,6 +333,12 @@ airbyte-cron:
       value: /tmp/workspace
   containers:
     cron:
-      image: airbyte/cron:0.40.18
+      image: airbyte/cron
+      image-tag: <- `${airbyte_version}`
       paths:
         - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
+  depends:
+    wait-for:
+      runnables:
+        - airbyte/airbyte-db
+      timeout: 60
