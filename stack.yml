@@ -28,7 +28,7 @@ stack:
   variables:
     airbyte_version:
       type: string
-      value: 0.40.18
+      value: 0.43.1
     airbyte_config_database_password:
       type: string
       value: ''
