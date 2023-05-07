@@ -16,6 +16,9 @@ stack:
       Its flexible architecture supports a wide range of data sources and destinations, making it a versatile solution for businesses of all sizes and industries. Airbyte also offers robust data transformation capabilities, allowing users to clean, enrich, and transform their data before sending it to its destination.
 
       With its reliability, scalability, and ease of use, Airbyte is a must-have tool for any business looking to streamline their data integration process.
+    source: https://github.com/airbytehq/airbyte
+    tags: Airbyte, data integration, ETL, open-source, Apache, Python, connectors, data pipeline, data synchronization, ELT, data warehousing, cloud-based, data engineering, database management
+    license: MIT License, Elastic License 2.0 (ELv2)
   runnable-list:
     - airbyte/airbyte-db
     - airbyte/airbyte-init
@@ -38,6 +41,9 @@ stack:
     # airbyte_config_database_url:
     #   type: string
     #   value: ''
+    airbyte_database_user:
+      type: string
+      value: monk
     airbyte_database_password:
       type: string
       value: monk
@@ -50,9 +56,3 @@ stack:
     airbyte_trackings_strategy:
       type: string
       value: segment
-    airbyte_domain:
-      type: string
-      value: localhost
-    airbyte_web_port:
-      type: string
-      value: 8000

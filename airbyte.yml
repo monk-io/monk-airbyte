@@ -15,31 +15,31 @@ airbyte-common:
       Its flexible architecture supports a wide range of data sources and destinations, making it a versatile solution for businesses of all sizes and industries. Airbyte also offers robust data transformation capabilities, allowing users to clean, enrich, and transform their data before sending it to its destination.
 
       With its reliability, scalability, and ease of use, Airbyte is a must-have tool for any business looking to streamline their data integration process.
+    source: https://github.com/airbytehq/airbyte
+    tags: Airbyte, data integration, ETL, open-source, Apache, Python, connectors, data pipeline, data synchronization, ELT, data warehousing, cloud-based, data engineering, database management
+    license: MIT License, Elastic License 2.0 (ELv2)
     private: true
   variables:
-    volume_local:
-      type: string
-      value: <- `${monk-volume-path}/airbyte`
     airbyte-version:
       env: AIRBYTE_VERSION
       type: string
-      value: <- `${airbyte_version}`
+      value: <- $airbyte_version default("0.43.1")
     airbyte-config-database-password:
       env: CONFIG_DATABASE_PASSWORD
       type: string
-      value: <- `${airbyte_config_database_password}`
-    airbyte-config-database-url:
-      env: CONFIG_DATABASE_URL
-      type: string
-      value: <- `${airbyte_config_database_url}`
+      value: <- $airbyte_config_database_password default("")
+    # airbyte-config-database-url:
+    #   env: CONFIG_DATABASE_URL
+    #   type: string
+    #   value: <- `${airbyte_config_database_url}`
     airbyte-config-database-user:
       env: CONFIG_DATABASE_USER
       type: string
-      value: <- `${airbyte_config_database_user}`
+      value: <- $airbyte_config_database_user default("")
     airbyte-database-password:
       env: DATABASE_PASSWORD
       type: string
-      value: <- `${airbyte_database_password}`
+      value: <- $airbyte_database_password default("monk")
     airbyte-database-host:
       env: DATABASE_HOST
       type: string
@@ -51,19 +51,19 @@ airbyte-common:
     airbyte-database-url:
       env: DATABASE_URL
       type: string
-      value: <- `jdbc:postgresql://${airbyte-database-host}:5432/airbyte`
+      value: <- "jdbc:postgresql://" $airbyte-database-host ":5432/airbyte" concat-all
     airbyte-database-user:
       env: DATABASE_USER
       type: string
-      value: docker
+      value: <- $airbyte_database_user default("monk")
     airbyte-log-level:
       env: LOG_LEVEL
       type: string
-      value: <- `${airbyte_log_level}`
+      value: <- $airbyte_log_level default("INFO")
     airbyte-database-migration:
       env: RUN_DATABASE_MIGRATION_ON_STARTUP
       type: string
-      value: <- `${airbyte_database_migration}`
+      value: <- $airbyte_database_migration default("true")
     airbyte-config-root:
       env: CONFIG_ROOT
       type: string
@@ -76,13 +76,10 @@ airbyte-common:
       env: DEPLOYMENT_MODE
       type: string
       value: production
-    airbyte-server-host:
-      type: string
-      value: <- connection-hostname("server")
     airbyte-internal-api-host:
       env: INTERNAL_API_HOST
       type: string
-      value: <- `${airbyte-server-host}:8001`
+      value: <- connection-hostname("server") ":8001" concat-all
     airbyte-jobs-dabatase-minimum-flyway-migration:
       env: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
       type: string
@@ -93,15 +90,24 @@ airbyte-common:
     airbyte-temporal-host:
       env: TEMPORAL_HOST
       type: string
-      value: <- `${airbyte-temporal-host-address}:7233`
+      value: <- $airbyte-temporal-host-address ":7233" concat-all
     airbyte-tracking-strategy:
       env: TRACKING_STRATEGY
       type: string
-      value: <- `${airbyte_trackings_strategy}`
+      value: <- $airbyte_trackings_strategy default("segment")
+    ip-address-public:
+      type: string
+      value: <- ip-address-public
+    domain:
+      type: string
+      value: <- $airbyte_domain default($ip-address-public)
+    web-port:
+      type: string
+      value: <- $airbyte_web_port default("8000")
     airbyte-webapp-url:
       env: WEBAPP_URL
       type: string
-      value: <- `http://${airbyte_domain}:${airbyte_web_port}/`
+      value: <- "http://" $domain ":" $web-port "/" concat-all
     airflow-workspace-root:
       env: WORKSPACE_ROOT
       type: string
@@ -144,31 +150,32 @@ airbyte-init:
   containers:
     init:
       image: airbyte/init
-      image-tag: <- `${airbyte_version}`
-      ports:
-        - 8001:7000
+      image-tag: <- $airbyte_version default("0.43.1")
       paths:
-        - <- `${volume_local}/tmp:/local_parent`
+        - <- `${monk-volume-path}/airbyte/tmp:/local_parent`
       bash: /bin/sh -c "./scripts/create_mount_directories.sh /local_parent ${HACK_LOCAL_ROOT_PARENT} ${LOCAL_ROOT}"
+  services:
+    init:
+      container: init
+      port: 7000
+      protocol: tcp
+      host-port: 8001
 
 airbyte-bootloader:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   containers:
     bootloader:
       image: airbyte/bootloader
-      image-tag: <- `${airbyte_version}`
+      image-tag: <- $airbyte_version default("0.43.1")
 
 airbyte-db:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   containers:
     db:
       image: airbyte/db
-      image-tag: <- `${airbyte_version}`
-      environment:
-        - <- `POSTGRES_PASSWORD=${airbyte-database-password}`
-        - <- `POSTGRES_USER=${airbyte-database-user}`
+      image-tag: <- $airbyte_version default("0.43.1")
   checks:
     readiness:
       code: exec("db", "pg_isready") "accepting connections" contains?
@@ -179,10 +186,19 @@ airbyte-db:
       container: db
       port: 5432
       protocol: tcp
+  variables:
+    airbyte-database-password:
+      env: POSTGRES_PASSWORD
+      type: string
+      value: <- $airbyte_database_password default("monk")
+    airbyte-database-user:
+      env: POSTGRES_USER
+      type: string
+      value: <- $airbyte_database_user default("monk")
 
 airbyte-worker:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   variables:
     airbyte_local_root:
       env: LOCAL_ROOT
@@ -199,12 +215,10 @@ airbyte-worker:
   containers:
     worker:
       image: airbyte/worker
-      image-tag: <- `${airbyte_version}`
-      ports:
-        - 9000:9000
+      image-tag: <- $airbyte_version default("0.43.1")
       paths:
-        - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
-        - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
+        - <- `${monk-volume-path}/airbyte/tmp/workspace:${airbyte-workspace-mount}`
+        - <- `${monk-volume-path}/airbyte${airbyte_local_root}:${airbyte_local_root}`
       environment:
         - SYNC_JOB_MAX_ATTEMPTS=3
         - SYNC_JOB_MAX_TIMEOUT_DAYS=3
@@ -223,10 +237,16 @@ airbyte-worker:
       runnables:
         - airbyte/airbyte-db
       timeout: 60
+  services:
+    db:
+      container: db
+      port: 9000
+      protocol: tcp
+      host-port: 9000
 
 airbyte-server:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   variables:
     airbyte_local_root:
       env: LOCAL_ROOT
@@ -243,12 +263,10 @@ airbyte-server:
   containers:
     server:
       image: airbyte/server
-      image-tag: <- `${airbyte_version}`
-      ports:
-        - 9001:9000
+      image-tag: <- $airbyte_version default("0.43.1")
       paths:
-        - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
-        - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
+        - <- `${monk-volume-path}/airbyte/tmp/workspace:${airbyte-workspace-mount}`
+        - <- `${monk-volume-path}/airbyte${airbyte_local_root}:${airbyte_local_root}`
   depends:
     wait-for:
       runnables:
@@ -261,16 +279,15 @@ airbyte-server:
       container: server
       port: 9000
       protocol: tcp
+      host-port: 9001
 
 airbyte-webapp:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   containers:
     webapp:
       image: airbyte/webapp
-      image-tag: <- `${airbyte_version}`
-      ports:
-        - 80:80
+      image-tag: <- $airbyte_version default("0.43.1")
       environment:
         - API_URL=/api/v1/
         - SYNC_JOB_MAX_TIMEOUT_DAYS=3
@@ -279,17 +296,21 @@ airbyte-webapp:
       runnables:
         - airbyte/airbyte-db
       timeout: 60
+  services:
+    server:
+      container: webapp
+      port: 80
+      protocol: tcp
+      host-port: 80
 
 airbyte-temporal:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   containers:
     temporal:
       image: airbyte/temporal
-      image-tag: <- `${airbyte_version}`
+      image-tag: <- $airbyte_version default("0.43.1")
       bash: /etc/temporal/start_temporal.sh
-      ports:
-        - 7233:7233
       environment:
         - DB=postgresql
         - DB_PORT=5432
@@ -322,10 +343,20 @@ airbyte-temporal:
       container: temporal
       port: 7233
       protocol: tcp
+      host-port: 7233
+  variables:
+    airbyte-database-password:
+      env: POSTGRES_PASSWORD
+      type: string
+      value: <- $airbyte_database_password default("monk")
+    airbyte-database-user:
+      env: POSTGRES_USER
+      type: string
+      value: <- $airbyte_database_user default("monk")
 
 airbyte-cron:
-  inherits: airbyte/airbyte-common
   defines: runnable
+  inherits: airbyte/airbyte-common
   variables:
     airbyte-workspace-mount:
       env: WORKSPACE_DOCKER_MOUNT
@@ -334,9 +365,9 @@ airbyte-cron:
   containers:
     cron:
       image: airbyte/cron
-      image-tag: <- `${airbyte_version}`
+      image-tag: <- $airbyte_version default("0.43.1")
       paths:
-        - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
+        - <- `${monk-volume-path}/airbyte/tmp/workspace:${airbyte-workspace-mount}`
   depends:
     wait-for:
       runnables:
