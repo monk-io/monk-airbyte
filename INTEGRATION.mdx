@@ -1,0 +1,166 @@
+---
+title: Airbyte
+description: Ready-to-run Airbyte container stack you can run directly or inherit to integrate data integration and ETL capabilities into your infrastructure.
+primary_category: data-integration
+tags: [airbyte, etl, data-integration, template, runnable, stack, pipeline, connectors]
+integration_type: template
+hosting_models: [self-hosted]
+website_url: https://airbyte.com/
+docs_url: https://docs.airbyte.com/
+publisher: monk.io
+---
+
+## Overview
+
+This template provides a production‑ready Airbyte stack as a Monk runnable. You can:
+
+- Run it directly to get a managed Airbyte deployment with all necessary components
+- Inherit it in your own stack to seamlessly add data integration and ETL capabilities
+
+Airbyte is an open-source data integration platform that allows you to move data from various sources to destinations. It provides a wide range of pre-built connectors and a user-friendly interface for managing data pipelines.
+
+## What this template manages
+
+- Airbyte webapp (user interface)
+- Airbyte server (API and orchestration)
+- Airbyte worker (job execution)
+- Airbyte scheduler and temporal (workflow management)
+- PostgreSQL database (metadata storage)
+- All necessary initialization and bootstrapping components
+
+## Quick start (run directly)
+
+1) Load templates
+
+```bash
+monk load MANIFEST
+```
+
+2) Run Airbyte stack with defaults
+
+```bash
+monk run monk-airbyte/stack
+```
+
+3) Access the web interface
+
+Once started, access the Airbyte web interface at `http://localhost:80` (or the configured host port).
+
+## Configuration
+
+Key variables you can customize in this template:
+
+```yaml
+variables:
+  airbyte_version: "0.40.18"                    # Airbyte version
+  airbyte_config_database_password: ""          # Config database password
+  airbyte_config_database_user: ""              # Config database user
+  airbyte_config_database_url: ""               # Config database URL
+  airbyte_database_password: "monk"             # Database password
+  airbyte_database_migration: "true"            # Enable database migration
+  airbyte_trackings_strategy: "segment"         # Tracking strategy
+```
+
+Data is persisted under `${monk-volume-path}/airbyte` on the host.
+
+## Use by inheritance (recommended for apps)
+
+Inherit the Airbyte stack in your application stack to add ETL capabilities. Example:
+
+```yaml
+namespace: myapp
+
+airbyte:
+  defines: process-group
+  runnable-list:
+    - monk-airbyte/stack
+
+api:
+  defines: runnable
+  containers:
+    api:
+      image: myorg/api
+  connections:
+    airbyte-server:
+      runnable: monk-airbyte/airbyte-server
+      service: airbyte-server
+  variables:
+    airbyte-server-url:
+      value: <- connection-hostname("airbyte-server") ":9001"
+    airbyte-api-endpoint:
+      value: <- "http://" connection-hostname("airbyte-server") ":9001/api"
+```
+
+Then run your app stack:
+
+```bash
+monk run myapp/api
+```
+
+Your application can now integrate with Airbyte's API to programmatically manage data pipelines, connectors, and sync jobs.
+
+## Stack components
+
+The Airbyte stack includes the following runnables:
+
+- `airbyte-webapp` - Web interface (port 80)
+- `airbyte-server` - API server (port 9001)
+- `airbyte-worker` - Job worker (port 9000)
+- `airbyte-scheduler` - Job scheduler
+- `airbyte-temporal` - Workflow engine (port 7233)
+- `airbyte-db` - PostgreSQL database
+- `airbyte-bootloader` - Initial setup
+- `airbyte-init` - Initialization service (port 8001)
+- `airbyte-cron` - Scheduled tasks
+
+## Ports and connectivity
+
+- Web interface: port `80`
+- Server API: port `9001`
+- Worker: port `9000`
+- Temporal: port `7233`
+- Init service: port `8001`
+
+From other runnables in the same process group, use `connection-hostname("<connection-name>")` to resolve the Airbyte server host.
+
+## Persistence and configuration
+
+- Workspace data: `${monk-volume-path}/airbyte/tmp/workspace`
+- Local data: `${monk-volume-path}/airbyte/tmp/airbyte_local`
+- Database data: managed by PostgreSQL container
+
+All data is persisted to host volumes, ensuring your connectors and pipeline configurations survive container restarts.
+
+## Related templates
+
+- Combine with monitoring tools (`prometheus-grafana/`) for observability
+- Integrate with database templates (`mariadb/`, `postgres/`, etc.) as sync destinations
+- Use with message queue templates (`kafka/`, `rabbitmq/`) for event-driven ETL
+
+## Troubleshooting
+
+- Ensure all required ports are available (80, 9000, 9001, 7233, 8001)
+- Check that the database initialization completed successfully
+- Verify all components are running:
+
+```bash
+monk logs -l 500 -f monk-airbyte/stack
+```
+
+- Check specific component logs:
+
+```bash
+monk logs -l 500 -f monk-airbyte/airbyte-webapp
+monk logs -l 500 -f monk-airbyte/airbyte-server
+monk logs -l 500 -f monk-airbyte/airbyte-worker
+```
+
+- If you encounter initialization issues, try purging and restarting:
+
+```bash
+monk purge -x -a monk-airbyte/stack
+monk run monk-airbyte/stack
+```
+
+- If the web interface is not accessible, ensure port 80 is not in use by another service
+
