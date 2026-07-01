@@ -122,11 +122,15 @@ airbyte-init:
   containers:
     init:
       image: airbyte/init:0.40.18
-      ports:
-        - <- `0.0.0.0:8001:7000`
       paths:
         - <- `${volume_local}/tmp:/local_parent`
       bash: /bin/sh -c "./scripts/create_mount_directories.sh /local_parent ${HACK_LOCAL_ROOT_PARENT} ${LOCAL_ROOT}"
+  services:
+    init-service:
+      container: init
+      port: 7000
+      protocol: tcp
+      host-port: 8001
 
 airbyte-bootloader:
   inherits: ./airbyte-common
@@ -165,8 +169,6 @@ airbyte-worker:
   containers:
     worker:
       image: airbyte/worker:0.40.18
-      ports: 
-        - 0.0.0.0:9000:9000
       paths:
         - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
         - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
@@ -183,7 +185,13 @@ airbyte-worker:
         - WORKFLOW_FAILURE_RESTART_DELAY_SECONDS=
         - USE_STREAM_CAPABLE_STATE=true
         - OTEL_COLLECTOR_ENDPOINT=http://host.docker.internal:4317
-      
+  services:
+    worker-service:
+      container: worker
+      port: 9000
+      protocol: tcp
+      host-port: 9000
+
 airbyte-server:
   inherits: ./airbyte-common
   defines: runnable
@@ -204,11 +212,15 @@ airbyte-server:
   containers:
     server:
       image: airbyte/server:0.40.18
-      ports: 
-        - 0.0.0.0:9001:9000
       paths:
         - <- `${volume_local}/tmp/workspace:${airbyte-workspace-mount}`
         - <- `${volume_local}${airbyte_local_root}:${airbyte_local_root}`
+  services:
+    server-service:
+      container: server
+      port: 9000
+      protocol: tcp
+      host-port: 9001
   depends:
     wait-for:
       runnables:
@@ -223,11 +235,15 @@ airbyte-webapp:
   containers:
     webapp:
       image: airbyte/webapp:0.40.18
-      ports: 
-        - 0.0.0.0:80:80
       environment:
         - API_URL=/api/v1/
         - SYNC_JOB_MAX_TIMEOUT_DAYS=3
+  services:
+    webapp-service:
+      container: webapp
+      port: 80
+      protocol: tcp
+      host-port: 80
 
 airbyte-temporal:
   inherits: ./airbyte-common
@@ -236,8 +252,6 @@ airbyte-temporal:
     temporal:
       image: airbyte/temporal:0.40.18
       bash: /etc/temporal/start_temporal.sh
-      ports: 
-        - 0.0.0.0:7233:7233
       environment:
         - DB=postgresql
         - DB_PORT=5432
@@ -245,6 +259,12 @@ airbyte-temporal:
         - <- `POSTGRES_PWD=${airbyte-database-password}`
         - <- `POSTGRES_SEEDS=${airbyte-database-host}`
         - <- `POSTGRES_USER=${airbyte-database-user}`
+  services:
+    temporal-service:
+      container: temporal
+      port: 7233
+      protocol: tcp
+      host-port: 7233
   files:
     temporal-config:
       container: temporal
